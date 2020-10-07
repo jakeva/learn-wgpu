@@ -117,24 +117,43 @@ pub struct Mesh {
     pub material: usize,
 }
 
-impl pipeline::Bindable for Mesh {
+struct BitangentComputeBinding {
+    src_vertex_buffer: wgpu::Buffer,
+    dst_vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    num_elements: u32,
+}
+
+impl pipeline::Bindable for BitangentComputeBinding {
     fn layout_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
         vec![
-            // Vertices
+            // Src Vertices
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::COMPUTE,
                 ty: wgpu::BindingType::StorageBuffer {
                     dynamic: false,
                     min_binding_size: None,
-                    // We WILL change the vertices in the compute shader
+                    // We use these vertices to compute the tangent and bitangent
+                    readonly: true,
+                },
+                count: None,
+            },
+            // Dst Vertices
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStage::COMPUTE,
+                ty: wgpu::BindingType::StorageBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                    // We'll store the computed tangent and bitangent here
                     readonly: false,
                 },
                 count: None,
             },
             // Indices
             wgpu::BindGroupLayoutEntry {
-                binding: 1,
+                binding: 2,
                 visibility: wgpu::ShaderStage::COMPUTE,
                 ty: wgpu::BindingType::StorageBuffer {
                     dynamic: false,
@@ -149,14 +168,19 @@ impl pipeline::Bindable for Mesh {
 
     fn bind_group_entries(&self) -> Vec<wgpu::BindGroupEntry> {
         vec![
-            // Vertices
+            // Src Vertices
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer(self.vertex_buffer.slice(..)),
+                resource: wgpu::BindingResource::Buffer(self.src_vertex_buffer.slice(..)),
+            },
+            // Dst Vertices
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Buffer(self.dst_vertex_buffer.slice(..)),
             },
             // Indices
             wgpu::BindGroupEntry {
-                binding: 0,
+                binding: 2,
                 resource: wgpu::BindingResource::Buffer(self.index_buffer.slice(..)),
             },
         ]
@@ -169,7 +193,7 @@ pub struct Model {
 }
 
 pub struct ModelLoader {
-    binder: pipeline::Binder<Mesh>,
+    binder: pipeline::Binder<BitangentComputeBinding>,
     pipeline: wgpu::ComputePipeline,
 }
 
@@ -253,7 +277,13 @@ impl ModelLoader {
                     })
                     .collect::<Vec<_>>();
 
-                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                let src_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("{:?} Vertex Buffer", m.name)),
+                    contents: bytemuck::cast_slice(&vertices),
+                    // UPDATED!
+                    usage: wgpu::BufferUsage::STORAGE,
+                });
+                let dst_vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{:?} Vertex Buffer", m.name)),
                     contents: bytemuck::cast_slice(&vertices),
                     // UPDATED!
@@ -268,17 +298,16 @@ impl ModelLoader {
 
                 // NEW!
                 // We'll need the mesh for the tangent/bitangent calculation
-                let mesh = Mesh {
-                    name: m.name.clone(),
-                    vertex_buffer,
+                let binding = BitangentComputeBinding {
+                    dst_vertex_buffer,
+                    src_vertex_buffer,
                     index_buffer,
                     num_elements: m.mesh.indices.len() as u32,
-                    material: m.mesh.material_id.unwrap_or(0),
                 };
 
                 // Calculate the tangents and bitangents
                 let calc_bind_group = self.binder.create_bind_group(
-                    &mesh, 
+                    &binding, 
                     device, 
                     Some("Mesh BindGroup")
                 );
@@ -289,12 +318,18 @@ impl ModelLoader {
                     let mut pass = encoder.begin_compute_pass();
                     pass.set_pipeline(&self.pipeline);
                     pass.set_bind_group(0, &calc_bind_group, &[]);
-                    pass.dispatch(mesh.num_elements as u32 / 3, 1, 1);
+                    pass.dispatch(binding.num_elements as u32 / 3, 1, 1);
                 }
                 queue.submit(std::iter::once(encoder.finish()));
                 device.poll(wgpu::Maintain::Wait);
 
-                Ok(mesh)
+                Ok(Mesh {
+                    name: m.name.clone(),
+                    vertex_buffer: binding.dst_vertex_buffer,
+                    index_buffer: binding.index_buffer,
+                    num_elements: binding.num_elements,
+                    material: m.mesh.material_id.unwrap_or(0),
+                })
             })
             .collect::<Result<Vec<_>>>()?;
 

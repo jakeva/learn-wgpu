@@ -124,6 +124,7 @@ impl State {
             })
             .await
             .unwrap();
+        let path = std::path::Path::new("trace");
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
@@ -131,7 +132,7 @@ impl State {
                     limits: wgpu::Limits::default(),
                     shader_validation: true,
                 },
-                None, // Trace path
+                Some(&path), // Trace path
             )
             .await
             .unwrap();

@@ -1,21 +1,24 @@
 #version 450
 
-#define VERTICES_PER_INDEX 3
-layout(local_size_x = VERTICES_PER_INDEX) in;
+#define VERTICES_PER_TRIANGLE 3
+layout(local_size_x = VERTICES_PER_TRIANGLE) in;
 
 // Should match the struct in model.rs
 struct ModelVertex {
     vec3 position;
-    vec3 tex_coords;
+    vec2 tex_coords;
     vec3 normal;
     vec3 tangent;
     vec3 bitangent;
 };
 
-layout(std140, binding=0) buffer VertexBuffer {
-    ModelVertex Vertices[];
+layout(std140, set=0, binding=0) buffer SrcVertexBuffer {
+    ModelVertex srcVertices[];
 };
-layout(std140, binding=1) buffer IndexBuffer {
+layout(std140, set=0, binding=1) buffer DstVertexBuffer {
+    ModelVertex dstVertices[];
+};
+layout(std140, set=0, binding=2) buffer IndexBuffer {
     uint Indices[];
 };
 
@@ -28,17 +31,17 @@ void main() {
     uint i2 = Indices[index + 2];
     
     // Grab the vertices for the triangle
-    ModelVertex v0 = Vertices[i0];
-    ModelVertex v1 = Vertices[i1];
-    ModelVertex v2 = Vertices[i2];
+    ModelVertex v0 = srcVertices[i0];
+    ModelVertex v1 = srcVertices[i1];
+    ModelVertex v2 = srcVertices[i2];
 
     // Grab the position and uv components of the vertices
     vec3 pos0 = v0.position;
     vec3 pos1 = v1.position;
     vec3 pos2 = v2.position;
-    vec3 uv0 = v0.tex_coords;
-    vec3 uv1 = v1.tex_coords;
-    vec3 uv2 = v2.tex_coords;
+    vec2 uv0 = v0.tex_coords;
+    vec2 uv1 = v1.tex_coords;
+    vec2 uv2 = v2.tex_coords;
 
     // Calculate the edges of the triangle
     vec3 delta_pos1 = pos1 - pos0;
@@ -46,8 +49,8 @@ void main() {
 
     // This will give us a direction to calculate the
     // tangent and bitangent
-    vec3 delta_uv1 = uv1 - uv0;
-    vec3 delta_uv2 = uv2 - uv0;
+    vec2 delta_uv1 = uv1 - uv0;
+    vec2 delta_uv2 = uv2 - uv0;
 
     // Solving the following system of equations will
     // give us the tangent and bitangent.
@@ -60,10 +63,10 @@ void main() {
     vec3 bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r;
 
     // We'll use the same tangent/bitangent for each vertex in the triangle
-    Vertices[i0].tangent = tangent;
-    Vertices[i1].tangent = tangent;
-    Vertices[i2].tangent = tangent;
-    Vertices[i0].bitangent = bitangent;
-    Vertices[i1].bitangent = bitangent;
-    Vertices[i2].bitangent = bitangent;
+    dstVertices[i0].tangent = tangent;
+    dstVertices[i1].tangent = tangent;
+    dstVertices[i2].tangent = tangent;
+    dstVertices[i0].bitangent = bitangent;
+    dstVertices[i1].bitangent = bitangent;
+    dstVertices[i2].bitangent = bitangent;
 }
