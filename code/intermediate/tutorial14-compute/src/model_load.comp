@@ -3,22 +3,22 @@
 #define VERTICES_PER_TRIANGLE 3
 layout(local_size_x = VERTICES_PER_TRIANGLE) in;
 
-// Should match the struct in model.rs
+// Marches the ModelVertex struct in model.rs
 struct ModelVertex {
-    vec3 position;
-    vec2 tex_coords;
-    vec3 normal;
-    vec3 tangent;
-    vec3 bitangent;
+    float x; float y; float z;
+    float uv; float uw;
+    float nx; float ny; float nz;
+    float tx; float ty; float tz;
+    float bx; float by; float bz;
 };
 
-layout(std140, set=0, binding=0) buffer SrcVertexBuffer {
+layout(std430, set=0, binding=0) buffer SrcVertexBuffer {
     ModelVertex srcVertices[];
 };
-layout(std140, set=0, binding=1) buffer DstVertexBuffer {
+layout(std430, set=0, binding=1) buffer DstVertexBuffer {
     ModelVertex dstVertices[];
 };
-layout(std140, set=0, binding=2) buffer IndexBuffer {
+layout(std430, set=0, binding=2) buffer IndexBuffer {
     uint Indices[];
 };
 
@@ -26,22 +26,27 @@ void main() {
     uint index = gl_GlobalInvocationID.x;
 
     // Grab the indices for the triangle
+    // Because we're indexing a float array, we'll need to use STRIDE to
+    // make sure we're pointing at the right data.
     uint i0 = Indices[index];
     uint i1 = Indices[index + 1];
     uint i2 = Indices[index + 2];
-    
-    // Grab the vertices for the triangle
-    ModelVertex v0 = srcVertices[i0];
-    ModelVertex v1 = srcVertices[i1];
-    ModelVertex v2 = srcVertices[i2];
 
-    // Grab the position and uv components of the vertices
-    vec3 pos0 = v0.position;
-    vec3 pos1 = v1.position;
-    vec3 pos2 = v2.position;
-    vec2 uv0 = v0.tex_coords;
-    vec2 uv1 = v1.tex_coords;
-    vec2 uv2 = v2.tex_coords;
+    // Get the position data from the vertex buffer
+    // vec3 pos0 = srcVertices[i0].position;
+    // vec3 pos1 = srcVertices[i1].position;
+    // vec3 pos2 = srcVertices[i2].position;
+    vec3 pos0 = vec3(srcVertices[i0].x, srcVertices[i0].y, srcVertices[i0].z);
+    vec3 pos1 = vec3(srcVertices[i1].x, srcVertices[i1].y, srcVertices[i1].z);
+    vec3 pos2 = vec3(srcVertices[i2].x, srcVertices[i2].y, srcVertices[i2].z);
+
+    // Get the tex_coord data. We only need x and y.
+    // vec2 uv0 = srcVertices[i0].tex_coords.xy;
+    // vec2 uv1 = srcVertices[i1].tex_coords.xy;
+    // vec2 uv2 = srcVertices[i2].tex_coords.xy;
+    vec2 uv0 = vec2(srcVertices[i0].uv, srcVertices[i0].uw);
+    vec2 uv1 = vec2(srcVertices[i1].uv, srcVertices[i1].uw);
+    vec2 uv2 = vec2(srcVertices[i2].uv, srcVertices[i2].uw);
 
     // Calculate the edges of the triangle
     vec3 delta_pos1 = pos1 - pos0;
@@ -63,10 +68,28 @@ void main() {
     vec3 bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * r;
 
     // We'll use the same tangent/bitangent for each vertex in the triangle
-    dstVertices[i0].tangent = tangent;
-    dstVertices[i1].tangent = tangent;
-    dstVertices[i2].tangent = tangent;
-    dstVertices[i0].bitangent = bitangent;
-    dstVertices[i1].bitangent = bitangent;
-    dstVertices[i2].bitangent = bitangent;
+    // dstVertices[i0].tangent = tangent;
+    // dstVertices[i1].tangent = tangent;
+    // dstVertices[i2].tangent = tangent;
+    // dstVertices[i0].bitangent = bitangent;
+    // dstVertices[i1].bitangent = bitangent;
+    // dstVertices[i2].bitangent = bitangent;
+    dstVertices[i0].tx = tangent.x;
+    dstVertices[i0].ty = tangent.y;
+    dstVertices[i0].tz = tangent.z;
+    dstVertices[i1].tx = tangent.x;
+    dstVertices[i1].ty = tangent.y;
+    dstVertices[i1].tz = tangent.z;
+    dstVertices[i2].tx = tangent.x;
+    dstVertices[i2].ty = tangent.y;
+    dstVertices[i2].tz = tangent.z;
+    dstVertices[i0].bx = bitangent.x;
+    dstVertices[i0].by = bitangent.y;
+    dstVertices[i0].bz = bitangent.z;
+    dstVertices[i1].bx = bitangent.x;
+    dstVertices[i1].by = bitangent.y;
+    dstVertices[i1].bz = bitangent.z;
+    dstVertices[i2].bx = bitangent.x;
+    dstVertices[i2].by = bitangent.y;
+    dstVertices[i2].bz = bitangent.z;
 }

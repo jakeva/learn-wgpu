@@ -15,6 +15,7 @@ pub trait Vertex {
 #[derive(Copy, Clone, Debug)]
 pub struct ModelVertex {
     position: cgmath::Vector3<f32>,
+    // tex_coords: cgmath::Vector3<f32>,
     tex_coords: cgmath::Vector2<f32>,
     normal: cgmath::Vector3<f32>,
     tangent: cgmath::Vector3<f32>,
@@ -39,20 +40,24 @@ impl Vertex for ModelVertex {
                 wgpu::VertexAttributeDescriptor {
                     offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 1,
+                    // format: wgpu::VertexFormat::Float3,
                     format: wgpu::VertexFormat::Float2,
                 },
                 wgpu::VertexAttributeDescriptor {
+                    // offset: mem::size_of::<[f32; 6]>() as wgpu::BufferAddress,
                     offset: mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float3,
                 },
                 // Tangent and bitangent
                 wgpu::VertexAttributeDescriptor {
+                    // offset: mem::size_of::<[f32; 9]>() as wgpu::BufferAddress,
                     offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
                     shader_location: 3,
                     format: wgpu::VertexFormat::Float3,
                 },
                 wgpu::VertexAttributeDescriptor {
+                    // offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
                     offset: mem::size_of::<[f32; 11]>() as wgpu::BufferAddress,
                     shader_location: 4,
                     format: wgpu::VertexFormat::Float3,
@@ -262,6 +267,7 @@ impl ModelLoader {
                                 m.mesh.positions[i * 3 + 2],
                             ]
                             .into(),
+                            // tex_coords: [m.mesh.texcoords[i * 2], m.mesh.texcoords[i * 2 + 1], 0.0]
                             tex_coords: [m.mesh.texcoords[i * 2], m.mesh.texcoords[i * 2 + 1]]
                                 .into(),
                             normal: [
